@@ -16,6 +16,9 @@ bool InitializeKinectNui() {
 	if (!g_kinect.InitializeDepthStream()) {
 		return false;
 	}
+	if (!g_kinect.EnableSkeltonTracking()) {
+		return false;
+	}
 	g_kinect.InitializeCvImage();
 	
 	return true;

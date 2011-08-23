@@ -15,6 +15,10 @@ namespace {
 
 MyKinectNUI::MyKinectNUI(void)
 {
+	m_bVideoStreamOpened = false;
+	m_bDepthStreamOpened = false;
+	m_bSkeletonTracking = false;
+
 	m_hInst = GetModuleHandle(0);
 	m_PensTotal = NUI_SKELETON_COUNT;
 	m_cameraAngle = NuiCameraElevationGetAngle(&m_cameraAngle);
@@ -66,6 +70,7 @@ bool MyKinectNUI::InitializeImageStream()
 		MessageBoxResource(m_hWnd, IDS_ERROR_VIDEOSTREAM, MB_OK | MB_ICONHAND);
 		return false;
 	}
+	m_bVideoStreamOpened = true;
 	return true;
 }
 
@@ -85,6 +90,7 @@ bool MyKinectNUI::InitializeDepthStream()
 		MessageBoxResource(m_hWnd, IDS_ERROR_DEPTHSTREAM, MB_OK | MB_ICONHAND);
 		return false;
 	}
+	m_bDepthStreamOpened = true;
 	return true;
 }
 
@@ -97,20 +103,26 @@ bool MyKinectNUI::EnableSkeltonTracking()
 		MessageBoxResource(m_hWnd, IDS_ERROR_SKELETONTRACKING, MB_OK | MB_ICONHAND);
 		return false;
 	}
+	m_bSkeletonTracking = true;
 	return true;
 }
 
 void MyKinectNUI::InitializeCvImage()
 {
-	cvNamedWindow(VideoWindow);
-	cvNamedWindow(DepthWindow);
-	cvNamedWindow(SkeletonWindow);
-	cvNamedWindow(PlayerWindow);
-
-	m_videoFrame = cvCreateImage(cvSize(640, 480), IPL_DEPTH_8U, 4);
-	m_depthFrame = cvCreateImage(cvSize(320, 240), IPL_DEPTH_16U, 1);
-	m_playerFrame = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 1);
-	m_skeletonFrame = cvCreateImage(cvSize(640, 480), IPL_DEPTH_8U, 3);
+	if (m_bVideoStreamOpened) {
+		cvNamedWindow(VideoWindow);
+		m_videoFrame = cvCreateImage(cvSize(640, 480), IPL_DEPTH_8U, 4);
+	}
+	if (m_bDepthStreamOpened) {
+		cvNamedWindow(DepthWindow);
+		cvNamedWindow(PlayerWindow);
+		m_depthFrame = cvCreateImage(cvSize(320, 240), IPL_DEPTH_16U, 1);
+		m_playerFrame = cvCreateImage(cvSize(320, 240), IPL_DEPTH_8U, 1);
+	}
+	if (m_bSkeletonTracking) {
+		cvNamedWindow(SkeletonWindow);
+		m_skeletonFrame = cvCreateImage(cvSize(640, 480), IPL_DEPTH_8U, 3);
+	}
 
 	m_hWnd = FindWindowA(NULL, SkeletonWindow);
 	m_SkeletonDC = GetDC(m_hWnd);
@@ -253,13 +265,26 @@ void MyKinectNUI::DrawSkeletonCVImg( IplImage* Skeleton, NUI_SKELETON_DATA * pSk
 	int scaleX = width;	// scaling up to image coordinates
 	int scaleY = height;
 	float fx = 0, fy = 0;
+	ushort depthZ = 0;
 	int i;
 
+	ushort headZ = 0;
+	ushort rightHandZ = 0;
+
 	for (i = 0; i < NUI_SKELETON_POSITION_COUNT; i++) {
-		NuiTransformSkeletonToDepthImageF(pSkel->SkeletonPositions[i], &fx, &fy);
+		NuiTransformSkeletonToDepthImageF(pSkel->SkeletonPositions[i], &fx, &fy, &depthZ);
 		m_Points[i].x = (int)(fx * scaleX + 0.5f);	// image座標系へ変換し、四捨五入
 		m_Points[i].y = (int)(fy * scaleY + 0.5f);
+		if (i == NUI_SKELETON_POSITION_HEAD) {
+			headZ = depthZ;
+		} else if (i == NUI_SKELETON_POSITION_HAND_RIGHT) {
+			rightHandZ = depthZ;
+		}
 	}
+
+	char buffer[128];
+	sprintf(buffer, "Head:%uh Hand:%uh %s\n", headZ, rightHandZ, rightHandZ + 1800 < headZ ? "MOUSE" : "");
+	OutputDebugStringA(buffer);
 
 	// おしり、背中、頭
 	DrawSkeletonSegmentCVImg(Skeleton, NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_SPINE, WhichSkeletonColor%m_PensTotal);

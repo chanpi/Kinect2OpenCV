@@ -92,6 +92,10 @@ private:
 
 	long m_cameraAngle;
 
+	bool m_bVideoStreamOpened;
+	bool m_bDepthStreamOpened;
+	bool m_bSkeletonTracking;
+
 	IplImage* m_videoFrame;
 	IplImage* m_depthFrame;
 	IplImage* m_skeletonFrame;
